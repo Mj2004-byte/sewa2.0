@@ -1,0 +1,32 @@
+# Environment Variables (CRITICAL)
+.env
+.env.local
+.env.*.local
+
+# Databases & Local SQLite
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads & Media Assets
+backend/uploads/
+uploads/
+
+# Build & Node outputs
+node_modules/
+frontend/node_modules/
+frontend/dist/
+dist/
+
+# Python Cache & Pytest
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.vercel/
