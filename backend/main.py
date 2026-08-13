@@ -37,6 +37,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Normalize API request path for Vercel serverless rewrites
+@app.middleware("http")
+async def normalize_api_path(request: Request, call_next):
+    path = request.scope.get("path", "")
+    if not path.startswith("/api") and not path.startswith("/static"):
+        request.scope["path"] = "/api" + path
+    return await call_next(request)
+
 try:
     Base.metadata.create_all(bind=engine)
     from backend.seed import seed_db
