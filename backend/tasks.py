@@ -11,13 +11,21 @@ from backend.agents.clustering_agent import ClusteringAgent
 from backend.agents.routing_agent import RoutingAgent
 from backend.agents.notification_agent import NotificationAgent
 
-# Initialize Celery app
-# Defaults to eager mode (running synchronously in the thread) for easy local debugging
-celery_app = Celery("sewa_tasks", broker=Config.REDIS_URL)
-celery_app.conf.update(
-    task_always_eager=Config.CELERY_ALWAYS_EAGER,
-    result_backend=Config.REDIS_URL if not Config.CELERY_ALWAYS_EAGER else None
-)
+# Initialize Celery app (or dummy eager executor for serverless environments)
+try:
+    from celery import Celery
+    celery_app = Celery("sewa_tasks", broker=Config.REDIS_URL)
+    celery_app.conf.update(
+        task_always_eager=Config.CELERY_ALWAYS_EAGER,
+        result_backend=Config.REDIS_URL if not Config.CELERY_ALWAYS_EAGER else None
+    )
+except Exception as e:
+    print(f"[Celery Warning] Eager fallback executor active: {e}")
+    class DummyCelery:
+        def task(self, func):
+            func.delay = func
+            return func
+    celery_app = DummyCelery()
 
 @celery_app.task
 def process_report_task(report_id: int):
