@@ -38,7 +38,12 @@ class Config:
     TWILIO_TRIAL_MODE = os.getenv("TWILIO_TRIAL_MODE", "True").lower() == "true"
     
     # Database
-    DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sewa.db")
+    is_vercel = bool(os.getenv("VERCEL"))
+    if is_vercel and not os.getenv("DATABASE_URL"):
+        DATABASE_URL = "sqlite:////tmp/sewa.db"
+    else:
+        DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sewa.db")
+        
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     CELERY_ALWAYS_EAGER = os.getenv("CELERY_ALWAYS_EAGER", "True").lower() == "true"
     
@@ -55,10 +60,16 @@ class Config:
     SMTP_FROM_EMAIL = os.getenv("SMTP_FROM_EMAIL", "sewa-alerts@sewa.gov.in")
     
     # Storage Directory
-    UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads")))
+    if is_vercel and not os.getenv("UPLOAD_DIR"):
+        UPLOAD_DIR = Path("/tmp/uploads")
+    else:
+        UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads")))
 
 # Ensure uploads directory exists
-Config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+try:
+    Config.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
 
 # EXPLICIT SLA CONFIGURATION MATRIX
 SLA_RULES = {
