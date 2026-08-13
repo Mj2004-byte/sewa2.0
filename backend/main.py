@@ -38,6 +38,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Exception diagnostic middleware for Vercel debugging
+@app.middleware("http")
+async def catch_exceptions_middleware(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as e:
+        import traceback
+        err_str = str(e)
+        trace = traceback.format_exc()
+        print(f"[VERCEL ERROR] {err_str}\n{trace}")
+        from fastapi.responses import JSONResponse
+        return JSONResponse(
+            status_code=500,
+            content={"detail": err_str, "error_type": type(e).__name__}
+        )
+
 try:
     Base.metadata.create_all(bind=engine)
     from backend.seed import seed_db
