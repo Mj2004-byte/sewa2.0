@@ -530,8 +530,8 @@ async def acknowledge_cluster(cluster_id: int, current_user: User = Depends(requ
 app.include_router(api_router, prefix="/api")
 app.include_router(api_router, prefix="")
 
-# SPA Catch-All Route (For local single-host development; Vercel Edge CDN handles static files)
-if not Config.is_vercel and FRONTEND_DIST.exists():
+# SPA Catch-All Route (Serves frontend/dist index.html for root and SPA client routes)
+if FRONTEND_DIST.exists():
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
         if full_path.startswith("api/") or full_path.startswith("static/"):
