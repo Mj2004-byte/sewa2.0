@@ -530,18 +530,15 @@ async def acknowledge_cluster(cluster_id: int, current_user: User = Depends(requ
 app.include_router(api_router, prefix="/api")
 app.include_router(api_router, prefix="")
 
-# SPA Catch-All Route (Serves frontend/dist index.html for root and SPA client routes)
+# SPA Page Routes (Serves frontend/dist/index.html cleanly for client routes)
 if FRONTEND_DIST.exists():
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        if full_path.startswith("api/") or full_path.startswith("static/"):
-            raise HTTPException(status_code=404, detail="Not Found")
-            
-        file_path = FRONTEND_DIST / full_path
-        if file_path.exists() and file_path.is_file():
-            from fastapi.responses import FileResponse
-            return FileResponse(file_path)
-            
+    @app.get("/")
+    @app.get("/home")
+    @app.get("/report")
+    @app.get("/my")
+    @app.get("/transparency")
+    @app.get("/authority")
+    async def serve_spa_page():
         from fastapi.responses import FileResponse
         return FileResponse(
             FRONTEND_DIST / "index.html",
