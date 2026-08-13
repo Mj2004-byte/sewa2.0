@@ -40,7 +40,14 @@ class Config:
     # Database
     is_vercel = bool(os.getenv("VERCEL"))
     if is_vercel and not os.getenv("DATABASE_URL"):
-        DATABASE_URL = "sqlite:////tmp/sewa.db"
+        tmp_db = Path("/tmp/sewa.db")
+        try:
+            tmp_db.parent.mkdir(parents=True, exist_ok=True)
+            if not tmp_db.exists():
+                tmp_db.touch()
+        except Exception as e:
+            print(f"[Config Warning] Could not touch /tmp/sewa.db: {e}")
+        DATABASE_URL = f"sqlite:///{tmp_db.as_posix()}"
     else:
         DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./sewa.db")
         
