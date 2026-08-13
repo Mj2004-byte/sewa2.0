@@ -137,30 +137,46 @@ export default function MapContainer({ clusters, center = [28.6139, 77.2090], zo
 
     // Attach global window handler for Leaflet popup clicks
     window.triggerSaarthiFromMap = async (clusterId) => {
-      let token = localStorage.getItem('sewa_token');
-      if (!token) {
-        try {
-          await fetch('/api/auth/otp/send', { method: 'POST', body: new URLSearchParams({ phone: '9999999999' }) });
-          const vRes = await fetch('/api/auth/otp/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ phone: '9999999999', code: '123456' })
-          });
-          const vData = await vRes.json();
-          if (vData.access_token) {
-            token = vData.access_token;
-            localStorage.setItem('sewa_token', token);
+      const getValidToken = async () => {
+        let t = localStorage.getItem('sewa_token');
+        if (!t) {
+          try {
+            await fetch('/api/auth/otp/send', { method: 'POST', body: new URLSearchParams({ phone: '9999999999' }) });
+            const vRes = await fetch('/api/auth/otp/verify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ phone: '9999999999', code: '123456' })
+            });
+            const vData = await vRes.json();
+            if (vData.access_token) {
+              t = vData.access_token;
+              localStorage.setItem('sewa_token', t);
+            }
+          } catch (e) {
+            console.error(e);
           }
-        } catch (e) {
-          console.error(e);
         }
-      }
+        return t;
+      };
+
+      let token = await getValidToken();
 
       try {
-        const res = await fetch(`/api/saarthi/trigger/${clusterId}`, {
+        let res = await fetch(`/api/saarthi/trigger/${clusterId}`, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
+
+        // If expired session, auto-refresh token and retry once
+        if (res.status === 401) {
+          localStorage.removeItem('sewa_token');
+          token = await getValidToken();
+          res = await fetch(`/api/saarthi/trigger/${clusterId}`, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+        }
+
         const data = await res.json();
         if (res.ok) {
           alert(`🤝 SAARTHI COMMUNITY ALLIANCE ACTIVATED!\n\n• Citizens United: ${data.distinct_citizens_united}\n• Contractor Notified: ${data.contractor_notified} (${data.contractor_email})\n• NGO Notified: ${data.ngo_notified}\n\nPublic contractor performance demand notice issued.`);
