@@ -20,13 +20,17 @@ export default function MyReports() {
     fetch('/api/reports/my', {
       headers: { 'Authorization': `Bearer ${token}` }
     })
-      .then(res => res.json())
+      .then(res => {
+        if (res.ok) return res.json();
+        return [];
+      })
       .then(data => {
-        setReports(data);
+        setReports(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(err => {
         console.error("Error loading my reports:", err);
+        setReports([]);
         setLoading(false);
       });
   };

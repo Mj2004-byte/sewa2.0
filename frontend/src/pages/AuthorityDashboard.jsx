@@ -24,11 +24,12 @@ export default function AuthorityDashboard() {
         return res.json();
       })
       .then(data => {
-        setClusters(data);
+        setClusters(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(err => {
         console.error("Error fetching authority dashboard clusters:", err);
+        setClusters([]);
         setLoading(false);
       });
   };

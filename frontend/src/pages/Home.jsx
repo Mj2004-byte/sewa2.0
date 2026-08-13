@@ -56,18 +56,25 @@ export default function Home({ onReportClick, onNavigate }) {
   const fetchClusters = () => {
     setLoading(true);
     fetch('/api/transparency/clusters')
-      .then(res => res.json())
+      .then(res => {
+        if (res.ok) return res.json();
+        return [];
+      })
       .then(data => {
-        setClusters(data);
-        if (data.length > 0) {
+        const clusterList = Array.isArray(data) ? data : [];
+        setClusters(clusterList);
+        if (clusterList.length > 0) {
           // Centering map to latest reported issue
-          const sorted = [...data].sort((a,b) => new Date(b.last_reported_at) - new Date(a.last_reported_at));
-          setMapCenter([sorted[0].latitude, sorted[0].longitude]);
+          const sorted = [...clusterList].sort((a,b) => new Date(b.last_reported_at) - new Date(a.last_reported_at));
+          if (sorted[0]?.latitude && sorted[0]?.longitude) {
+            setMapCenter([sorted[0].latitude, sorted[0].longitude]);
+          }
         }
         setLoading(false);
       })
       .catch(err => {
         console.error("Error loading clusters:", err);
+        setClusters([]);
         setLoading(false);
       });
   };
