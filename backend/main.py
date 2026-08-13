@@ -530,17 +530,34 @@ async def acknowledge_cluster(cluster_id: int, current_user: User = Depends(requ
 app.include_router(api_router, prefix="/api")
 app.include_router(api_router, prefix="")
 
-# SPA Page Routes (Serves frontend/dist/index.html cleanly for client routes)
-if FRONTEND_DIST.exists():
-    @app.get("/")
-    @app.get("/home")
-    @app.get("/report")
-    @app.get("/my")
-    @app.get("/transparency")
-    @app.get("/authority")
-    async def serve_spa_page():
+# SPA Page Routes (Unstoppable fallback serving HTML for root and client routes)
+@app.get("/")
+@app.get("/home")
+@app.get("/report")
+@app.get("/my")
+@app.get("/transparency")
+@app.get("/authority")
+async def serve_spa_page():
+    index_file = FRONTEND_DIST / "index.html"
+    if index_file.exists():
         from fastapi.responses import FileResponse
-        return FileResponse(
-            FRONTEND_DIST / "index.html",
-            headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"}
-        )
+        return FileResponse(index_file, headers={"Cache-Control": "no-cache, no-store, must-revalidate, max-age=0"})
+    
+    dev_index = Config.BASE_DIR.parent / "frontend" / "index.html"
+    if dev_index.exists():
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse(content=dev_index.read_text(encoding="utf-8"))
+        
+    from fastapi.responses import HTMLResponse
+    return HTMLResponse(content="""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sewa - Civic Issue Reporting & Escalation Platform</title>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>""")
