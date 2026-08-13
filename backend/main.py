@@ -6,7 +6,7 @@ import base64
 import requests
 from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Header, Request
+from fastapi import FastAPI, Depends, HTTPException, status, UploadFile, File, Form, Header, Request, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -25,8 +25,9 @@ if Config.ENV == "production":
     if Config.JWT_SECRET == "sewa_dev_secret_change_in_production_321!":
         print("[WARNING] Default JWT_SECRET is being used. Set JWT_SECRET in production environment variables.")
 
-# Initialize FastAPI app
+# Initialize FastAPI app and router
 app = FastAPI(title="Sewa API", description="Civic Reporting and Escalation Platform")
+api_router = APIRouter()
 
 # Enable CORS for local PWA testing
 app.add_middleware(
@@ -36,14 +37,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Normalize API request path for Vercel serverless rewrites
-@app.middleware("http")
-async def normalize_api_path(request: Request, call_next):
-    path = request.scope.get("path", "")
-    if not path.startswith("/api") and not path.startswith("/static"):
-        request.scope["path"] = "/api" + path
-    return await call_next(request)
 
 try:
     Base.metadata.create_all(bind=engine)
@@ -142,7 +135,7 @@ def require_role(required_role: str):
 
 # --- AUTHENTICATION ROUTES ---
 
-@app.post("/api/auth/otp/send")
+@api_router.post("/auth/otp/send")
 async def send_otp(phone: str = Form(...), db: Session = Depends(get_db)):
     """Sends a 6-digit OTP code to the phone number."""
     user = db.query(User).filter(User.phone == phone).first()
@@ -168,7 +161,7 @@ async def send_otp(phone: str = Form(...), db: Session = Depends(get_db)):
             
     return {"message": "Verification code sent successfully", "phone": phone}
 
-@app.post("/api/auth/otp/verify")
+@api_router.post("/auth/otp/verify")
 async def verify_otp(phone: str = Form(...), code: str = Form(...), name: Optional[str] = Form(None), db: Session = Depends(get_db)):
     """Verifies OTP and returns a signed bearer token. Bypasses 123456 ONLY if ENV == 'development'."""
     user = db.query(User).filter(User.phone == phone).first()
@@ -191,7 +184,7 @@ async def verify_otp(phone: str = Form(...), code: str = Form(...), name: Option
     token = create_access_token({"phone": user.phone, "role": user.role})
     return {"access_token": token, "token_type": "bearer", "role": user.role, "name": user.name, "phone": user.phone}
 
-@app.get("/api/auth/me")
+@api_router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return {
         "id": current_user.id,
@@ -203,7 +196,7 @@ async def get_me(current_user: User = Depends(get_current_user)):
 
 # --- REPORT SUBMISSION & TIMELINE ROUTES ---
 
-@app.post("/api/reports/submit")
+@api_router.post("/reports/submit")
 async def submit_report(
     file: UploadFile = File(...),
     latitude: Optional[float] = Form(None),
@@ -262,12 +255,12 @@ async def submit_report(
         "severity": new_report.severity
     }
 
-@app.get("/api/reports/my")
+@api_router.get("/reports/my")
 async def get_my_reports(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     reports = db.query(Report).filter(Report.submitted_by == current_user.id).order_by(Report.created_at.desc()).all()
     return reports
 
-@app.get("/api/reports/{report_id}/timeline")
+@api_router.get("/reports/{report_id}/timeline")
 async def get_report_timeline(report_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
@@ -342,12 +335,12 @@ async def get_report_timeline(report_id: int, current_user: User = Depends(get_c
 
 # --- PUBLIC TRANSPARENCY ROUTES ---
 
-@app.get("/api/transparency/clusters")
+@api_router.get("/transparency/clusters")
 async def get_public_clusters(db: Session = Depends(get_db)):
     clusters = db.query(ReportCluster).filter(ReportCluster.category != "flagged").all()
     return clusters
 
-@app.get("/api/transparency/stats")
+@api_router.get("/transparency/stats")
 async def get_public_stats(db: Session = Depends(get_db)):
     total_reports = db.query(Report).filter(Report.category != "flagged").count()
     resolved_reports = db.query(Report).filter(Report.status == "resolved").count()
@@ -370,7 +363,7 @@ async def get_public_stats(db: Session = Depends(get_db)):
 
 # --- GENAI CHATBOT ASSISTANT ROUTE ("Sewa Mitra") ---
 
-@app.post("/api/chat")
+@api_router.post("/chat")
 async def chat_with_sewa_mitra(
     data: dict,
     current_user: User = Depends(get_current_user),
@@ -446,7 +439,7 @@ async def chat_with_sewa_mitra(
 
 # --- SAARTHI AGENT ROUTE ("Saarthi Community Alliance") ---
 
-@app.post("/api/saarthi/trigger/{cluster_id}")
+@api_router.post("/saarthi/trigger/{cluster_id}")
 async def trigger_saarthi(
     cluster_id: int,
     current_user: User = Depends(get_current_user),
@@ -462,7 +455,7 @@ async def trigger_saarthi(
         raise HTTPException(status_code=404, detail=result["error"])
     return result
 
-@app.get("/api/authority/clusters")
+@api_router.get("/authority/clusters")
 async def get_authority_dashboard_clusters(current_user: User = Depends(require_role("authority")), db: Session = Depends(get_db)):
     """
     Returns active clusters. PROTECTED by require_role('authority'). Rejects citizen tokens with 403 Forbidden.
@@ -500,7 +493,7 @@ async def get_authority_dashboard_clusters(current_user: User = Depends(require_
         
     return result
 
-@app.post("/api/authority/clusters/{cluster_id}/resolve")
+@api_router.post("/authority/clusters/{cluster_id}/resolve")
 async def resolve_cluster(cluster_id: int, current_user: User = Depends(require_role("authority")), db: Session = Depends(get_db)):
     """Marks a cluster as RESOLVED. Rejects citizen tokens with 403 Forbidden."""
     cluster = db.query(ReportCluster).filter(ReportCluster.id == cluster_id).first()
@@ -517,7 +510,7 @@ async def resolve_cluster(cluster_id: int, current_user: User = Depends(require_
     db.commit()
     return {"message": f"Cluster {cluster_id} marked RESOLVED successfully"}
 
-@app.post("/api/authority/clusters/{cluster_id}/acknowledge")
+@api_router.post("/authority/clusters/{cluster_id}/acknowledge")
 async def acknowledge_cluster(cluster_id: int, current_user: User = Depends(require_role("authority")), db: Session = Depends(get_db)):
     """Marks a cluster as ACKNOWLEDGED. Rejects citizen tokens with 403 Forbidden."""
     cluster = db.query(ReportCluster).filter(ReportCluster.id == cluster_id).first()
@@ -532,6 +525,10 @@ async def acknowledge_cluster(cluster_id: int, current_user: User = Depends(requ
         
     db.commit()
     return {"message": f"Cluster {cluster_id} marked acknowledged"}
+
+# Mount API Router under both /api and root prefixes (handles both Vercel stripped and full paths)
+app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="")
 
 # SPA Catch-All Route (For local single-host development; Vercel Edge CDN handles static files)
 if not Config.is_vercel and FRONTEND_DIST.exists():
