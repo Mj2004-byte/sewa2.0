@@ -31,10 +31,13 @@ if is_sqlite:
     connect_args = {"check_same_thread": False}
     engine = create_engine(DATABASE_URL, connect_args=connect_args)
     
-    # Register the haversine_distance function on the sqlite connection
+    # Register the haversine_distance function on the sqlite connection safely
     @event.listens_for(engine, "connect")
     def sqlite_connect(dbapi_connection, connection_record):
-        dbapi_connection.create_function("haversine_distance", 4, haversine_distance)
+        try:
+            dbapi_connection.create_function("haversine_distance", 4, haversine_distance)
+        except Exception as e:
+            print(f"[SQLite Connect Warning] {e}")
 else:
     engine = create_engine(DATABASE_URL)
 
@@ -42,6 +45,14 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
+    # Ensure tables exist and initial clusters/accounts are seeded in serverless ephemeral storage
+    try:
+        Base.metadata.create_all(bind=engine)
+        from backend.seed import seed_db
+        seed_db()
+    except Exception as e:
+        print(f"[DB Auto-Create Warning] {e}")
+        
     db = SessionLocal()
     try:
         yield db
