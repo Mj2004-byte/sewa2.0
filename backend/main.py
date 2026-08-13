@@ -37,15 +37,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-Base.metadata.create_all(bind=engine)
+try:
+    Base.metadata.create_all(bind=engine)
+    from backend.seed import seed_db
+    seed_db()
+except Exception as e:
+    print(f"[Database Init Warning] {e}")
 
 # Serve upload folder statically
-app.mount("/static", StaticFiles(directory=str(Config.UPLOAD_DIR)), name="static")
+try:
+    app.mount("/static", StaticFiles(directory=str(Config.UPLOAD_DIR)), name="static")
+except Exception as e:
+    print(f"[Static Mount Warning] {e}")
 
 # Mount frontend production dist assets if it exists
 FRONTEND_DIST = Config.BASE_DIR.parent / "frontend" / "dist"
 if FRONTEND_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+    try:
+        app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+    except Exception as e:
+        print(f"[Assets Mount Warning] {e}")
 
 
 # --- CRYPTOGRAPHIC SIGNED TOKEN UTILITIES ---
