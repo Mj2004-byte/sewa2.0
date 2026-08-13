@@ -8,11 +8,11 @@ from backend.database import Base, engine, SessionLocal
 from backend.seed import seed_data
 from backend.main import app
 
-# Auto-initialize database tables on Vercel serverless invocation if needed
+# Ensure database tables exist on Vercel
 try:
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
     seed_data(db)
     db.close()
 except Exception as e:
-    print(f"[Vercel Init] Database init exception: {e}")
+    print(f"[Vercel Init Warning] {e}")
