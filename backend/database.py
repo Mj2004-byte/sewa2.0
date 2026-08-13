@@ -25,11 +25,15 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     except Exception:
         return 9999999.0
 
+from sqlalchemy.pool import StaticPool
+
 # Database engine configuration
 if is_sqlite:
-    # sqlite requires some extra configurations for path and threading
     connect_args = {"check_same_thread": False}
-    engine = create_engine(DATABASE_URL, connect_args=connect_args)
+    if Config.is_vercel:
+        engine = create_engine("sqlite:///:memory:", connect_args=connect_args, poolclass=StaticPool)
+    else:
+        engine = create_engine(DATABASE_URL, connect_args=connect_args)
     
     # Register the haversine_distance function on the sqlite connection safely
     @event.listens_for(engine, "connect")
